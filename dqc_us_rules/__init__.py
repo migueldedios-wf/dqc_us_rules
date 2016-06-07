@@ -1,20 +1,38 @@
-# (c) Copyright 2015 - 2016, XBRL US Inc. All rights reserved.   
-# See license.md for license information.  
+# (c) Copyright 2015 - 2016, XBRL US Inc. All rights reserved.
+# See license.md for license information.
 # See PatentNotice.md for patent infringement notice.
 import pkgutil
 import sys
 import inspect
 
 
-def run_checks(val):
+def run_checks(val, *args, **kwargs):
     """
     The function to run all of the validation checks under the SEC package
     """
     plugin_modules = _plugins_to_run(sys.modules[__name__])
     for plugin in plugin_modules:
-        if plugin.__file__ is not None and plugin.__file__.find('__init__.py') == -1 and hasattr(plugin, '__pluginInfo__'):
-            func = plugin.__pluginInfo__['Validate.XBRL.Finally']
-            func(val)
+        try:
+            if ((plugin.__file__ is not None and
+                 plugin.__file__.find('__init__.py') == -1 and
+                 hasattr(plugin, '__pluginInfo__'))):
+
+                func = plugin.__pluginInfo__['Validate.XBRL.Finally']
+                func(val, *args, **kwargs)
+        except Exception as err:
+            # This is an overly generic error catch, but it will hopefully
+            # be able to be pared down in the future.
+            val.modelXbrl.error(
+                "dqc_us_rules.exception:" + type(err).__name__,
+                (
+                    "Testcase validation exception: "
+                    "%(error)s, testcase: %(testcase)s"
+                ),
+                modelXbrl=val.modelXbrl,
+                testcase=val.modelXbrl.modelDocument.basename,
+                error=err,
+                exc_info=True
+            )
 
 
 def _plugins_to_run(mod, include_start=True):
@@ -42,11 +60,11 @@ def _plugins_to_run(mod, include_start=True):
 __pluginInfo__ = {
     'name': 'DQC.SEC.ALL',
     'version': '1.0',
-    'description': '''All Data Quality Committee SEC Filing Checks''',
+    'description': 'All Data Quality Committee SEC Filing Checks',
     'author': '',
     'license': 'See accompanying license text',
     # Required plugin for logging
-    'import': ( 'logging/dqcParameters.py', ),
-    #Mount points
+    'import': ('logging/dqcParameters.py', ),
+    # Mount points
     'Validate.XBRL.Finally': run_checks,
 }
